@@ -2,6 +2,9 @@
 
 A production-oriented streaming data pipeline demonstrating scalability, fault tolerance, and modular architecture patterns.
 
+## Python Version
+Cassandra supports python version supported between 3.9 and 3.11
+
 ## Architecture
 
 The system follows a decoupled, event-driven architecture:
