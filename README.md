@@ -82,12 +82,52 @@ Different responsibilities. Kafka handles event streaming; Airflow manages orche
 
 | Port | Service |
 |------|---------|
+| 2181 | Zookeeper |
 | 8080 | Airflow UI |
+| 8081 | Schema Registry |
 | 9021 | Kafka Control Center |
+| 9090 | Spark Master UI |
 | 9092 | Kafka Broker |
-| 8081 | Spark Master UI |
 | 9042 | Cassandra |
-| 5432 | PostgreSQL |
+
+### Service Startup Order
+
+Services start in dependency chains. Docker Compose waits for health checks before starting dependent services.
+
+```
+           ┌─────────────────────────────────────────────────────────────┐
+           │                    KAFKA CHAIN                              │
+           │  zookeeper ──▶ broker ──▶ schema-registry ──▶ control-center│
+           └─────────────────────────────────────────────────────────────┘
+
+           ┌─────────────────────────────────────────────────────────────┐
+           │                   AIRFLOW CHAIN                             │
+           │              postgres ──▶ webserver ──▶ scheduler           │
+           └─────────────────────────────────────────────────────────────┘
+
+           ┌─────────────────────────────────────────────────────────────┐
+           │                    SPARK CHAIN                              │
+           │                spark-master ──▶ spark-worker                │
+           └─────────────────────────────────────────────────────────────┘
+
+           ┌─────────────────────────────────────────────────────────────┐
+           │                    STANDALONE                               │
+           │                     cassandra                               │
+           └─────────────────────────────────────────────────────────────┘
+```
+
+**Startup sequence:**
+
+1. **Phase 1 (parallel):** `zookeeper`, `postgres`, `spark-master`, `cassandra` — no dependencies, start immediately
+2. **Phase 2:** `broker` starts after zookeeper is healthy
+3. **Phase 3:** `schema-registry` and `webserver` start after broker and postgres are healthy (respectively)
+4. **Phase 4:** `control-center`, `scheduler`, `spark-worker` start after their dependencies pass health checks
+
+**Why this matters:**
+- Kafka won't accept connections until Zookeeper confirms cluster coordination
+- Schema Registry requires Kafka to store schemas
+- Control Center needs both broker and Schema Registry to display topics and schemas
+- Airflow webserver initializes the DB; scheduler runs migrations and starts after
 
 ## Project Structure
 
@@ -131,11 +171,12 @@ Wait 2-3 minutes for all services to initialize.
 |---------|---------------|
 | Airflow UI | http://localhost:8080 |
 | Kafka Control Center | http://localhost:9021 |
-| Spark Master UI | http://localhost:8081 |
+| Spark Master UI | http://localhost:9090 |
+| Schema Registry | http://localhost:8081 |
 
 ```bash
 # Check Kafka topics
-docker exec -it kafka kafka-topics.sh --list --bootstrap-server localhost:9092
+docker exec -it broker kafka-topics --list --bootstrap-server localhost:9092
 
 # Check Cassandra
 docker exec -it cassandra cqlsh -e "DESCRIBE KEYSPACES;"
@@ -175,10 +216,30 @@ CREATE TABLE IF NOT EXISTS spark_streams.users (
 2. Monitor the `users_created` topic in Control Center
 3. Submit the Spark streaming job:
 
+**Option A: Copy script and run inside container**
 ```bash
-docker exec -it spark-master spark-submit \
-  --packages com.datastax.spark:spark-cassandra-connector_2.12:3.4.1,org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.1 \
-  /opt/bitnami/spark/jobs/spark_stream.py
+# Copy script to container
+docker cp scripts/spark_stream.py spark-master:/opt/spark/
+
+# Submit job
+docker exec -it spark-master /opt/spark/bin/spark-submit \
+  --packages com.datastax.spark:spark-cassandra-connector_2.12:3.5.1,org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1 \
+  /opt/spark/spark_stream.py
+```
+
+**Option B: Add volume mount to docker-compose.yaml**
+```yaml
+spark-master:
+  # ... existing config ...
+  volumes:
+    - ./scripts:/opt/spark/scripts
+```
+
+Then run:
+```bash
+docker exec -it spark-master /opt/spark/bin/spark-submit \
+  --packages com.datastax.spark:spark-cassandra-connector_2.12:3.5.1,org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1 \
+  /opt/spark/scripts/spark_stream.py
 ```
 
 ### 6. Verify Data
@@ -204,11 +265,12 @@ docker exec -it cassandra cqlsh -e "SELECT * FROM spark_streams.users LIMIT 5;"
 | Issue | Solution |
 |-------|----------|
 | Kafka broker not available | Ensure Zookeeper is healthy: `docker logs zookeeper` |
-| Spark job OOM error | Increase worker memory in `docker-compose.yaml` (min 1GB) |
-| Cassandra connection refused | Wait 60s after container start; check `docker logs cassandra` |
-| Schema Registry errors | Kafka must be fully up before Schema Registry starts |
+| Spark job OOM error | Increase `SPARK_WORKER_MEMORY` in docker-compose (default: 1g) |
+| Cassandra connection refused | Wait 60-90s after container start; check `docker logs cassandra` |
+| Schema Registry errors | Broker must be fully healthy first; check `docker logs broker` |
 | DAG not visible in Airflow | Verify file is in `dags/` folder with no syntax errors |
 | Python/Cassandra driver issues | Confirm Python version is 3.9 - 3.11 |
+| Control Center won't start | Requires both broker AND schema-registry healthy first |
 
 ## Challenges & Learnings
 
