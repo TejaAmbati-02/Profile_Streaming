@@ -94,7 +94,7 @@ def setup_local_logger():
 
     """ commented code in """
     ### Get the current date and time for the log filename
-    log_filename = datetime.now().strftime("mcit-logs-%Y_%m_%d %H_%M_%S.log")
+    log_filename = datetime.now().strftime("data-streaming-logs-%Y_%m_%d %H_%M_%S.log")
     ### Create a TimedRotatingFileHandler to rotate the log file daily
     handler = TimedRotatingFileHandler(
         os.path.join(LOGS_FOLDER_PATH, log_filename),
@@ -113,7 +113,7 @@ def setup_local_logger():
     """ commented code out """
 
     # Create a logger object and attach the handler to it
-    logger = logging.getLogger("mcit_logger")
+    logger = logging.getLogger("data_streaming_logger")
     logger.setLevel(logging.INFO)
 
     """ commented code in """
@@ -150,7 +150,7 @@ def setup_local_logger():
 
 # Initialize the logger
 
-if platform.system() == "Windows":
+if platform.system() in ["Windows", 'Darwin']:
     logger = setup_local_logger()
 else:
     # logger = setup_app_insights_logger()
