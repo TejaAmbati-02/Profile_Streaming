@@ -17,7 +17,7 @@ services:
       - confluent
 
   broker:
-    image: confluentinc/cp-server:7.4.0
+    image: confluentinc/cp-kafka:7.4.0
     hostname: broker
     container_name: broker
     depends_on:
@@ -32,27 +32,21 @@ services:
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://broker:29092,PLAINTEXT_HOST://localhost:9092
-      KAFKA_METRIC_REPORTERS: io.confluent.metrics.reporter.ConfluentMetricsReporter
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
-      KAFKA_CONFLUENT_LICENSE_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_CONFLUENT_BALANCER_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_JMX_PORT: 9101
       KAFKA_JMX_HOSTNAME: localhost
-      KAFKA_CONFLUENT_SCHEMA_REGISTRY_URL: http://schema-registry:8081
-      CONFLUENT_METRICS_REPORTER_BOOTSTRAP_SERVERS: broker:29092
-      CONFLUENT_METRICS_REPORTER_TOPIC_REPLICAS: 1
-      CONFLUENT_METRICS_ENABLE: 'false'
-      CONFLUENT_SUPPORT_CUSTOMER_ID: 'anonymous'
+      KAFKA_HEAP_OPTS: "-Xmx512M -Xms512M"
     networks:
       - confluent
     healthcheck:
-      test: ["CMD", "bash", "-c", 'nc -z localhost 9092']
+      test: ["CMD", "bash", "-c", "nc -z localhost 9092"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 30s
 
   schema-registry:
     image: confluentinc/cp-schema-registry:7.4.0
@@ -134,6 +128,9 @@ services:
       - EXECUTOR=Sequential
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
       - AIRFLOW_WEBSERVER_SECRET_KEY=this_is_a_very_secured_key
+      - AIRFLOW__WEBSERVER__WEB_SERVER_MASTER_TIMEOUT=300
+      - AIRFLOW__WEBSERVER__WEB_SERVER_WORKER_TIMEOUT=300
+      - AIRFLOW__WEBSERVER__WORKERS=2
     logging:
       options:
         max-size: 10m
@@ -145,10 +142,11 @@ services:
     ports:
       - "8080:8080"
     healthcheck:
-      test: ['CMD-SHELL', "[ -f /opt/airflow/airflow-webserver.pid ]"]
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
       interval: 30s
       timeout: 30s
-      retries: 3
+      retries: 10
+      start_period: 120s
     networks:
       - confluent
 
@@ -177,11 +175,6 @@ services:
     ports:
       - "9090:8080"
       - "7077:7077"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
     networks:
       - confluent
 
@@ -190,8 +183,7 @@ services:
     container_name: spark-worker
     command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
     depends_on:
-      spark-master:
-        condition: service_healthy
+      - spark-master
     environment:
       SPARK_WORKER_CORES: 2
       SPARK_WORKER_MEMORY: 1g
