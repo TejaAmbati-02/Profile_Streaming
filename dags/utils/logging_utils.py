@@ -82,7 +82,7 @@ class JsonFormatter(logging.Formatter):
             "status": getattr(record, "status", "Success"),
             "latency": getattr(record, "latency", ""),
             "environment": getattr(record, "environment", os.environ.get("ENV_NAME")),
-            "logger_name": f"[Subscriber Pipeline]"
+            "logger_name": f"[Publisher Pipeline]"
         }
 
         return json.dumps(log_entry, ensure_ascii=False)
@@ -94,7 +94,7 @@ def setup_local_logger():
 
     """ commented code in """
     ### Get the current date and time for the log filename
-    log_filename = datetime.now().strftime("data-subscriber-logs-%Y_%m_%d %H_%M_%S.log")
+    log_filename = datetime.now().strftime("publisher-logs-%Y_%m_%d %H_%M_%S.log")
     ### Create a TimedRotatingFileHandler to rotate the log file daily
     handler = TimedRotatingFileHandler(
         os.path.join(LOGS_FOLDER_PATH, log_filename),
@@ -113,7 +113,7 @@ def setup_local_logger():
     """ commented code out """
 
     # Create a logger object and attach the handler to it
-    logger = logging.getLogger("data_subscriber_logger")
+    logger = logging.getLogger("publisher_logger")
     logger.setLevel(logging.INFO)
 
     """ commented code in """
