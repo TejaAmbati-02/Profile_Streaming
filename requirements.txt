@@ -1,14 +1,9 @@
-# Providers (image is apache/airflow:2.6.0-python3.9)
 apache-airflow-providers-common-sql==1.7.1
 apache-airflow-providers-ftp==3.5.1
 apache-airflow-providers-http==4.5.1
 apache-airflow-providers-imap==3.3.1
 apache-airflow-providers-sqlite==3.4.3
-
-# Your project dependencies
 cassandra-driver==3.28.0
 kafka-python==2.0.2
-
-# Pin these to fix conflicts with base image providers
 urllib3<2.0.0
 protobuf<4.0.0
