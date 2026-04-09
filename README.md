@@ -136,7 +136,8 @@ Services start in dependency chains. Docker Compose waits for health checks befo
 ├── dags/
 │   └── kafka_stream.py        # Airflow DAG for API ingestion
 ├── scripts/
-│   └── spark_stream.py        # Spark streaming job
+│   └── entrypoint.sh
+├── spark_stream.py            # Spark streaming job
 ├── docker-compose.yaml        # Container orchestration
 ├── requirements.txt
 └── README.md
