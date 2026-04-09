@@ -202,10 +202,11 @@ services:
       - CASSANDRA_USERNAME=cassandra
       - CASSANDRA_PASSWORD=cassandra
     healthcheck:
-      test: ["CMD-SHELL", "cqlsh -e 'describe cluster'"]
+      test: ["CMD-SHELL", "cqlsh -e 'describe cluster' || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 10
+      start_period: 120s
     networks:
       - confluent
 

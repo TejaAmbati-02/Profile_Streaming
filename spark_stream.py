@@ -23,13 +23,13 @@ from dataclasses import dataclass
 from typing import Optional
 import uuid
 
-from cassandra.auth import PlainTextAuthProvider
 from cassandra.cluster import Cluster, Session
 from pyspark.sql import SparkSession, DataFrame
 from pyspark.sql.functions import from_json, col
 from pyspark.sql.types import StructType, StructField, StringType
 
 from utils.logging_utils import logger
+
 
 
 # Configuration
@@ -43,15 +43,11 @@ class CassandraConfig:
         port: Cassandra native transport port
         keyspace: Target keyspace name
         table: Target table name
-        username: Authentication username (optional)
-        password: Authentication password (optional)
     """
     host: str = "localhost"
     port: int = 9042
     keyspace: str = "spark_streams"
     table: str = "created_users"
-    username: Optional[str] = None
-    password: Optional[str] = None
 
 
 @dataclass
@@ -84,6 +80,7 @@ class SparkConfig:
     checkpoint_location: str = "/tmp/checkpoint"
 
 
+
 # Schema Definition
 class UserSchema:
     """
@@ -114,6 +111,7 @@ class UserSchema:
             StructField("phone", StringType(), nullable=True),
             StructField("picture", StringType(), nullable=True),
         ])
+
 
 
 # Cassandra Manager
@@ -153,18 +151,9 @@ class CassandraManager:
             bool: True if connection successful, False otherwise
         """
         try:
-            # Configure authentication if credentials provided
-            auth_provider = None
-            if self.config.username and self.config.password:
-                auth_provider = PlainTextAuthProvider(
-                    username=self.config.username,
-                    password=self.config.password
-                )
-            
             self.cluster = Cluster(
                 contact_points=[self.config.host],
-                port=self.config.port,
-                auth_provider=auth_provider
+                port=self.config.port
             )
             self.session = self.cluster.connect()
             
@@ -206,7 +195,7 @@ class CassandraManager:
         """Create the users table with appropriate schema."""
         query = f"""
             CREATE TABLE IF NOT EXISTS {self.config.keyspace}.{self.config.table} (
-                id UUID PRIMARY KEY,
+                id TEXT PRIMARY KEY,
                 first_name TEXT,
                 last_name TEXT,
                 gender TEXT,
@@ -267,6 +256,7 @@ class CassandraManager:
             logger.info("Cassandra connection closed")
 
 
+
 # Spark Streaming Manager
 class SparkStreamingManager:
     """
@@ -287,10 +277,9 @@ class SparkStreamingManager:
             manager.write_to_cassandra(df)
     """
     
-    # Spark package dependencies
     SPARK_PACKAGES = [
-        "com.datastax.spark:spark-cassandra-connector_2.12:3.4.1",
-        "org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.1",
+        "com.datastax.spark:spark-cassandra-connector_2.12:3.5.1",
+        "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.3",
     ]
     
     def __init__(
@@ -429,6 +418,7 @@ class SparkStreamingManager:
             logger.info("Spark session stopped")
 
 
+
 # Main Pipeline Orchestrator
 class StreamingPipeline:
     """
@@ -488,8 +478,8 @@ class StreamingPipeline:
         The method blocks until the streaming query terminates
         or an error occurs.
         """
-
         logger.info("Starting Kafka-Spark-Cassandra Streaming Pipeline")
+        
         try:
             # Step 1: Setup Cassandra
             if not self._setup_cassandra():
@@ -520,6 +510,12 @@ class StreamingPipeline:
         
         if not self.cassandra_manager.setup_schema():
             return False
+        
+        # ADD THIS - Check row count
+        result = self.cassandra_manager.session.execute(
+            "SELECT COUNT(*) FROM spark_streams.created_users;"
+        )
+        print(f"Current row count: {result.one()[0]}")
         
         return True
     
@@ -557,18 +553,22 @@ class StreamingPipeline:
         if self.cassandra_manager:
             self.cassandra_manager.close()
         
-        if self.spark_manager:
+        if self.spark_manager and hasattr(self.spark_manager, 'stop'):
             self.spark_manager.stop()
 
+
+
 if __name__ == "__main__":
+    # Configure for Docker environment
+    # Change hosts to container names when running in Docker
     cassandra_config = CassandraConfig(
-        host="localhost",
+        host="localhost",  # Use "cassandra" in Docker
         keyspace="spark_streams",
         table="created_users"
     )
     
     kafka_config = KafkaConfig(
-        bootstrap_servers="localhost:9092",  # "broker:29092" in Docker
+        bootstrap_servers="localhost:9092",  # Use "broker:29092" in Docker
         topic="users_created"
     )
     

@@ -192,7 +192,7 @@ docker exec -it cassandra cqlsh
 CREATE KEYSPACE IF NOT EXISTS spark_streams
 WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
 
-CREATE TABLE IF NOT EXISTS spark_streams.users (
+CREATE TABLE IF NOT EXISTS spark_streams.created_users (
     id UUID PRIMARY KEY,
     first_name TEXT,
     last_name TEXT,
@@ -242,11 +242,36 @@ docker exec -it spark-master /opt/spark/bin/spark-submit \
   /opt/spark/scripts/spark_stream.py
 ```
 
-### 6. Verify Data
+### 6. Verify Data in Cassandra
 
+**Quick check:**
 ```bash
-docker exec -it cassandra cqlsh -e "SELECT * FROM spark_streams.users LIMIT 5;"
+# Docker
+docker exec -it cassandra cqlsh -e "SELECT COUNT(*) FROM spark_streams.created_users;"
+
+# Podman
+podman exec -it cassandra cqlsh -e "SELECT COUNT(*) FROM spark_streams.created_users;"
 ```
+
+**Detailed verification:**
+```bash
+# List all keyspaces
+docker exec -it cassandra cqlsh -e "DESCRIBE KEYSPACES;"
+
+# Check tables in spark_streams keyspace
+docker exec -it cassandra cqlsh -e "USE spark_streams; DESCRIBE TABLES;"
+
+# View table schema
+docker exec -it cassandra cqlsh -e "DESCRIBE TABLE spark_streams.created_users;"
+
+# Sample data
+docker exec -it cassandra cqlsh -e "SELECT id, first_name, last_name, email FROM spark_streams.created_users LIMIT 10;"
+
+# Row count
+docker exec -it cassandra cqlsh -e "SELECT COUNT(*) FROM spark_streams.created_users;"
+```
+
+> **Note:** Replace `docker` with `podman` if using Podman.
 
 ## Useful Commands
 
