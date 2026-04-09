@@ -37,7 +37,7 @@ from airflow.operators.python import PythonOperator
 # Add project root to path for local imports
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from utils.logging_utils import logger, log_function
+# from utils.logging_utils import logger, log_function
 
 
 
@@ -165,7 +165,7 @@ class RandomUserAPIClient(DataSource):
         """
         self.config = config or APIConfig()
     
-    @log_function
+    # @log_function
     def fetch(self) -> dict[str, Any]:
         """
         Fetch a random user from the API.
@@ -206,7 +206,7 @@ class UserDataTransformer:
     """
     
     @staticmethod
-    @log_function
+    # @log_function
     def transform(raw_data: dict[str, Any]) -> UserData:
         """
         Transform raw API data into a UserData object.
@@ -240,10 +240,10 @@ class UserDataTransformer:
             picture=raw_data["picture"]["medium"],
         )
         
-        logger.info(
-            f"Transformed user data",
-            extra={"user_id": user.id, "username": user.username}
-        )
+        # logger.info(
+        #     f"Transformed user data",
+        #     extra={"user_id": user.id, "username": user.username}
+        # )
         return user
 
 
@@ -312,7 +312,7 @@ class KafkaPublisher:
             bool: True if published successfully, False otherwise
         """
         if not self.producer:
-            logger.error("Producer not connected")
+            # logger.error("Producer not connected")
             return False
         
         try:
@@ -323,14 +323,14 @@ class KafkaPublisher:
             # Wait for confirmation
             future.get(timeout=10)
             
-            logger.info(
-                f"Published user to Kafka",
-                extra={"user_id": user.id, "topic": self.config.topic}
-            )
+            # logger.info(
+            #     f"Published user to Kafka",
+            #     extra={"user_id": user.id, "topic": self.config.topic}
+            # )
             return True
             
         except KafkaError as e:
-            logger.error(f"Failed to publish to Kafka: {e}")
+            # logger.error(f"Failed to publish to Kafka: {e}")
             return False
     
     def flush(self) -> None:
@@ -343,7 +343,7 @@ class KafkaPublisher:
         if self.producer:
             self.producer.flush()
             self.producer.close()
-            logger.info("Kafka producer closed")
+            # logger.info("Kafka producer closed")
 
 
 
@@ -396,10 +396,10 @@ class UserDataStreamingJob:
         Returns:
             dict: Statistics with 'messages_sent' and 'errors' counts
         """
-        logger.info("=" * 50)
-        logger.info("Starting User Data Streaming Job")
-        logger.info(f"Duration: {self.streaming_config.duration_seconds}s")
-        logger.info("=" * 50)
+
+        # logger.info("Starting User Data Streaming Job")
+        # logger.info(f"Duration: {self.streaming_config.duration_seconds}s")
+
         
         if not self.publisher.connect():
             raise RuntimeError("Failed to connect to Kafka")
@@ -409,9 +409,9 @@ class UserDataStreamingJob:
         finally:
             self.publisher.close()
         
-        logger.info(
-            f"Streaming complete. Sent: {self.messages_sent}, Errors: {self.errors}"
-        )
+        # logger.info(
+        #     f"Streaming complete. Sent: {self.messages_sent}, Errors: {self.errors}"
+        # )
         
         return {
             "messages_sent": self.messages_sent,
@@ -427,9 +427,9 @@ class UserDataStreamingJob:
         while time.time() < end_time:
             # Check error threshold
             if consecutive_errors >= self.streaming_config.max_errors:
-                logger.error(
-                    f"Stopping: {consecutive_errors} consecutive errors"
-                )
+                # logger.error(
+                #     f"Stopping: {consecutive_errors} consecutive errors"
+                # )
                 break
             
             try:
@@ -445,12 +445,12 @@ class UserDataStreamingJob:
                     consecutive_errors += 1
                 
             except requests.RequestException as e:
-                logger.error(f"API request failed: {e}")
+                # logger.error(f"API request failed: {e}")
                 self.errors += 1
                 consecutive_errors += 1
                 
             except Exception as e:
-                logger.error(f"Unexpected error: {e}")
+                # logger.error(f"Unexpected error: {e}")
                 self.errors += 1
                 consecutive_errors += 1
             
@@ -545,4 +545,4 @@ if __name__ == "__main__":
     )
     
     stats = job.run()
-    logger.info(f"Final Stats: {stats}")
+    # logger.info(f"Final Stats: {stats}")
