@@ -1,0 +1,3 @@
+Netcat Utility
+
+nc -lk 9998 ->producer localhost 
